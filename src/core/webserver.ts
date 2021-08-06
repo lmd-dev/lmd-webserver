@@ -167,6 +167,15 @@ export class WebServer
             this._httpsWebsockets?.on(action, callback);
     }
 
+    public removeWebSocketAction(action: string, target: WebsocketTarget = WebsocketTarget.BOTH)
+    {
+        if(target === WebsocketTarget.BOTH || target === WebsocketTarget.HTTP)
+            this._httpWebsockets?.removeAllListeners(action);
+
+        if(target === WebsocketTarget.BOTH || target === WebsocketTarget.HTTPS)
+            this._httpsWebsockets?.removeAllListeners(action);
+    }
+
     public addWebsocketsMiddleware(middleware: (...args: any[]) => void, target: WebsocketTarget = WebsocketTarget.BOTH)
     {
         if(target === WebsocketTarget.BOTH || target === WebsocketTarget.HTTP)
