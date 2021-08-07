@@ -4,7 +4,7 @@ import { Routers } from "./routers/routers";
 import * as http from "http";
 import * as https from "https";
 import Session from "express-session";
-import * as SocketIO from "socket.io";
+import { WebSockets, WebSocketsOptions } from "./websockets/websockets";
 
 export interface WebServerOptions
 {
@@ -22,17 +22,7 @@ export interface WebServerOptions
         enable?: boolean;
         passPhrase?: string;
     },
-    websockets?: {
-        enable?: boolean,
-        options?: any /*SocketIO.ServerOptions*/
-    }
-}
-
-export enum WebsocketTarget
-{
-    BOTH = 0,
-    HTTP = 1,
-    HTTPS = 2
+    websockets?: WebSocketsOptions
 }
 
 export class WebServer
@@ -60,18 +50,11 @@ export class WebServer
 
     private readonly _sessionPassPhrase: string;
     public get sessionPassPhrase(): string { return this._sessionPassPhrase; }
-
-    private readonly _enableWebsockets : boolean;
-    public get enableWebsockets() : boolean {return this._enableWebsockets; }
-
-    private readonly _websocketsOptions : SocketIO.ServerOptions | undefined;
-    public get websocketsOptions() : SocketIO.ServerOptions | undefined {return this._websocketsOptions; }
     
     private readonly _express: Express.Application;
     private readonly _httpServer : http.Server | null;    
     private readonly _httpsServer : https.Server | null;
-    private readonly _httpWebsockets: SocketIO.Server | null;
-    private readonly _httpsWebsockets: SocketIO.Server | null;
+    private readonly _websockets: WebSockets | null;
 
     private readonly _routers: Routers;
     public get routers(): Routers { return this._routers; }
@@ -96,14 +79,11 @@ export class WebServer
         this._enableSessions = options.sessions?.enable ?? false;
         this._sessionPassPhrase = options.sessions?.passPhrase ?? "";
 
-        this._enableWebsockets = options.websockets?.enable ?? false;
-        this._websocketsOptions = options.websockets?.options;
-
         this._express = Express();
         this._httpServer = this._enableHttp ? http.createServer(this._express) : null;
         this._httpsServer = this._enableHttps ? https.createServer({ key: this.privateKey, cert: this.certificate }, this._express): null;
-        this._httpWebsockets = this._httpServer && this._enableWebsockets ? new SocketIO.Server(this._httpServer, this.websocketsOptions) : null;
-        this._httpsWebsockets = this._httpsServer && this._enableWebsockets ? new SocketIO.Server(this._httpsServer, this.websocketsOptions) : null;
+
+        this._websockets = options.websockets?.enable ? new WebSockets(this._httpServer, this._httpsServer, options.websockets) : null;        
 
         this._routers = new Routers(this._express);
         this._middlewares = new Middlewares(this._express);
@@ -158,39 +138,5 @@ export class WebServer
         }
     }
 
-    public addWebsocketsAction(action: string, callback: (... args: any[]) => void, target: WebsocketTarget = WebsocketTarget.BOTH)
-    {
-        if(target === WebsocketTarget.BOTH || target === WebsocketTarget.HTTP)
-            this._httpWebsockets?.on(action, callback);
-
-        if(target === WebsocketTarget.BOTH || target === WebsocketTarget.HTTPS)
-            this._httpsWebsockets?.on(action, callback);
-    }
-
-    public removeWebSocketAction(action: string, target: WebsocketTarget = WebsocketTarget.BOTH)
-    {
-        if(target === WebsocketTarget.BOTH || target === WebsocketTarget.HTTP)
-            this._httpWebsockets?.removeAllListeners(action);
-
-        if(target === WebsocketTarget.BOTH || target === WebsocketTarget.HTTPS)
-            this._httpsWebsockets?.removeAllListeners(action);
-    }
-
-    public addWebsocketsMiddleware(middleware: (...args: any[]) => void, target: WebsocketTarget = WebsocketTarget.BOTH)
-    {
-        if(target === WebsocketTarget.BOTH || target === WebsocketTarget.HTTP)
-            this._httpWebsockets?.use(middleware);
-
-        if(target === WebsocketTarget.BOTH || target === WebsocketTarget.HTTPS)
-            this._httpsWebsockets?.use(middleware);
-    }
-
-    public emitWebsockets(action: string, target: WebsocketTarget = WebsocketTarget.BOTH)
-    {
-        if(target === WebsocketTarget.BOTH || target === WebsocketTarget.HTTP)
-            this._httpWebsockets?.emit(action);
-
-        if(target === WebsocketTarget.BOTH || target === WebsocketTarget.HTTPS)
-            this._httpsWebsockets?.emit(action);
-    }
+    
 }
